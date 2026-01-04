@@ -1,0 +1,35 @@
+# Exclude user-specified folders
+Embedded_Project2/
+Prepping_for_starlink/
+projects/
+.git/
+.env/
+.metadata/
+.venv_win/
+.vscode/
+
+# Build / temporary files
+Debug/
+build/
+*.exe
+*.log
+*.obj
+*.o
+*.tmp
+*.swp
+*.pyc
+__pycache__/
+.vs/
+
+# IDE files
+.idea/
+*.iml
+
+# STM32 artifacts
+*.ld
+*.bin
+*.elf
+*.hex
+
+# Don't ignore .h5 or your model files (you asked to include them)
+# Consider using Git LFS for large binary files like .h5 if push fails due to size

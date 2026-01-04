@@ -122,6 +122,47 @@ def build_small_cnn(input_len):
     return model
 
 
+####
+## Function for HIL Simulator
+####
+def save_golden_data(X, y):
+    """
+    Saves one Normal and one Apnea window to both C header and text files.
+    This ensures Firmware and HIL Simulator use IDENTICAL data.
+    """
+    print("\n💾 Saving Golden Data...")
+    
+    # Try finding the 10th or 20th Normal sample instead of the 1st
+    idx_normal = np.where(y == 0)[0][20] 
+    idx_apnea = np.where(y == 1)[0][20]
+    
+    # Extract the actual windows (already normalized)
+    win_normal = X[idx_normal].flatten()
+    win_apnea = X[idx_apnea].flatten()
+    
+    # --- 1. Save C Header (for STM32) ---
+    with open("one_window.h", "w") as f:
+        f.write("#ifndef ONE_WINDOW_H\n")
+        f.write("#define ONE_WINDOW_H\n\n")
+        f.write("#include <stdint.h>\n\n")
+        f.write(f"#define ONE_WINDOW_LEN {len(win_normal)}\n\n")
+        
+        f.write("static const float normal_window[ONE_WINDOW_LEN] = {\n")
+        f.write(", ".join(f"{x:.8f}f" for x in win_normal))
+        f.write("\n};\n\n")
+        
+        f.write("static const float apnea_window[ONE_WINDOW_LEN] = {\n")
+        f.write(", ".join(f"{x:.8f}f" for x in win_apnea))
+        f.write("\n};\n\n")
+        f.write("#endif // ONE_WINDOW_H\n")
+    
+    # --- 2. Save Text Files (for Python HIL) ---
+    # We save them as simple lists of numbers
+    np.savetxt("normal_data.txt", win_normal, fmt="%.8f", newline=",")
+    np.savetxt("apnea_data.txt", win_apnea, fmt="%.8f", newline=",")
+    
+    print("✅ Created: one_window.h, normal_data.txt, apnea_data.txt")
+
 def main():
     # 1. FIND RECORDS
     records = list_records(DATA_DIR)
@@ -152,6 +193,11 @@ def main():
     X = np.concatenate(X_list, axis=0)
     y = np.concatenate(y_list, axis=0)
     print("Total windows collected:", X.shape[0])
+
+    ### HIL FUNCTION CALL
+    # === ADD THIS LINE ===
+    save_golden_data(X, y)
+    # =====================
 
     # 3. PREPARE DATA (Reshape & Split)
     X = X[..., np.newaxis]

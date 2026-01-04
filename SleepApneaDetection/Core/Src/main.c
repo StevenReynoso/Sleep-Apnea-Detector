@@ -9,7 +9,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "app_x-cube-ai.h"
-
+#include <stdlib.h> // Required for atof()
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "apnea_ai.h"
@@ -52,6 +52,34 @@ void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+// Helper to read one float number from UART (ends with \n)
+float get_sample_from_uart(UART_HandleTypeDef *huart) {
+    char rx_buffer[32];
+    uint8_t rx_byte;
+    int idx = 0;
+
+    while (1) {
+        // Read 1 byte at a time
+        if (HAL_UART_Receive(huart, &rx_byte, 1, HAL_MAX_DELAY) == HAL_OK) {
+            // If we hit a newline, we have the full number
+            if (rx_byte == '\n' || rx_byte == '\r') {
+                if (idx > 0) { // Only break if we actually have data
+                    rx_buffer[idx] = '\0';
+                    break;
+                }
+            }
+            else {
+                // Keep adding to buffer if it fits
+                if (idx < 31) {
+                    rx_buffer[idx++] = (char)rx_byte;
+                }
+            }
+        }
+    }
+    // Convert string "-1.234" to float
+    return (float)atof(rx_buffer);
+}
+/* USER CODE END 0 */
 /* Local UART print helper */
 static void uart_print(const char *msg)
 {
@@ -113,46 +141,26 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
-  {
-      /* --- TEST 1: The Apnea Case --- */
-      // Copy the specific apnea array into the buffer
-      memcpy(ecg_buf, apnea_window, sizeof(apnea_window));
+      {
+          uart_print("\r\n=== READY FOR HIL DATA ===\r\n");
 
-      // Run prediction
-      float prob = apnea_ai_predict(ecg_buf, AI_NETWORK_IN_1_SIZE);
+          // 1. Fill buffer
+          for (int i = 0; i < AI_NETWORK_IN_1_SIZE; i++) {
+              ecg_buf[i] = get_sample_from_uart(&huart2);
+              if (i % 500 == 0) HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+          }
 
-      uart_print("Injecting APNEA Data... ");
-      uart_print_prob(prob);
+          // 2. Run Inference
+          float prob = apnea_ai_predict(ecg_buf, AI_NETWORK_IN_1_SIZE);
 
-      // LED Logic: Turn ON if > 0.5
-      if (prob > 0.5f) {
-          HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-      } else {
-          HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+          // 3. Report
+          char msg[64];
+          snprintf(msg, sizeof(msg), "HIL Result: %.7f\r\n", prob);
+          uart_print(msg);
+
+          HAL_Delay(100); // Small delay before next window
       }
-
-      HAL_Delay(3000);
-
-      /* --- TEST 2: The Normal Case --- */
-      // Copy the specific normal array into the buffer
-      memcpy(ecg_buf, normal_window, sizeof(normal_window));
-
-      // Run prediction
-      prob = apnea_ai_predict(ecg_buf, AI_NETWORK_IN_1_SIZE);
-
-      uart_print("Injecting NORMAL Data... ");
-      uart_print_prob(prob);
-
-      // LED Logic
-      if (prob > 0.5f) {
-          HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-      } else {
-          HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-      }
-
-      HAL_Delay(3000);
-  }
-  /* USER CODE END 3 */
+    /* USER CODE END 3 */
 }
 
 /**

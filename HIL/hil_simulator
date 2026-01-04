@@ -2,78 +2,35 @@ import serial
 import time
 import numpy as np
 
+
 # Configuration
 PORT = 'COM9'
 BAUD_RATE = 115200
 WINDOW_SIZE = 6000 
 
 def generate_window(condition):
-    """
-    Loads 'Golden Data' from text files and normalizes EXACTLY like training.
-    """
     data_window = []
-    
     try:
-        if condition == 'APNEA':
-            with open('apnea_data.txt', 'r') as f:
-                raw_text = f.read().replace('\n', ',').replace('f', '')
-                data_window = [float(x) for x in raw_text.split(',') if x.strip()]
+        filename = 'apnea_data.txt' if condition == 'APNEA' else 'normal_data.txt'
+        
+        with open(filename, 'r') as f:
+            raw_text = f.read().replace('\n', ',').replace('f', '')
+            data_window = [float(x) for x in raw_text.split(',') if x.strip()]
                 
-        elif condition == 'NORMAL':
-            with open('normal_data.txt', 'r') as f:
-                raw_text = f.read().replace('\n', ',').replace('f', '')
-                data_window = [float(x) for x in raw_text.split(',') if x.strip()]
-                
-        # Handle size mismatch
         if len(data_window) > WINDOW_SIZE:
             data_window = data_window[:WINDOW_SIZE]
         elif len(data_window) < WINDOW_SIZE:
             data_window += [0.0] * (WINDOW_SIZE - len(data_window))
 
         print(f"\n   📁 LOADED {condition} - {len(data_window)} samples")
-        
-        # Show BEFORE normalization stats
-        raw_mean = np.mean(data_window)
-        raw_std = np.std(data_window)
-        raw_min = np.min(data_window)
-        raw_max = np.max(data_window)
-        
-        print(f"   📊 RAW STATS: mean={raw_mean:.4f}, std={raw_std:.4f}")
-        print(f"      Range: [{raw_min:.4f}, {raw_max:.4f}]")
-        
-        # ========================================
-        # CRITICAL: Apply SAME normalization as training!
-        # Training does: window = (window - mean) / std
-        # ========================================
-        
-        # Convert to numpy for easier math
-        data_window = np.array(data_window, dtype=np.float32)
-        
-        # Per-window z-score normalization (EXACTLY like train_apnea.py)
-        mean = np.mean(data_window)
-        std = np.std(data_window)
-        
-        if std < 1e-6:
-            print("   ⚠️  WARNING: Std too small, skipping normalization")
-        else:
-            data_window = (data_window - mean) / std
-        
-        # Show AFTER normalization stats
-        norm_mean = np.mean(data_window)
-        norm_std = np.std(data_window)
-        norm_min = np.min(data_window)
-        norm_max = np.max(data_window)
-        
-        print(f"   ✅ NORMALIZED: mean={norm_mean:.4f}, std={norm_std:.4f}")
-        print(f"      Range: [{norm_min:.4f}, {norm_max:.4f}]")
-        print(f"   Head: {data_window[0]:.4f}, {data_window[1]:.4f}, {data_window[2]:.4f}")
-        print(f"   Tail: {data_window[-3]:.4f}, {data_window[-2]:.4f}, {data_window[-1]:.4f}")
+        # Just print stats, don't change data!
+        print(f"   📊 RAW STATS: Range=[{min(data_window):.4f}, {max(data_window):.4f}]")
             
     except Exception as e:
-        print(f"⚠️ Could not load data file for {condition}: {e}")
-        return np.random.normal(0, 1, WINDOW_SIZE)
+        print(f"⚠️ Error: {e}")
+        return np.random.normal(0, 1, WINDOW_SIZE).tolist()
 
-    return data_window.tolist()  # Convert back to list for serial transmission
+    return data_window # Return exactly what was loaded
 
 def run_simulation():
     try:
@@ -134,9 +91,6 @@ def run_simulation():
                     prediction = "APNEA" if score > 0.5 else "NORMAL"
                     match = "✅ CORRECT" if prediction == condition else "❌ WRONG"
                     print(f"   Prediction: {prediction} (score={score:.4f}) {match}")
-                if "INTERNAL Result:" in response:
-                    score = float(response.split(":")[-1].strip())
-                    print(f"   Internal Test: score={score:.4f} (should be ~0.20 for NORMAL)")
                     
             time.sleep(1)
                         
