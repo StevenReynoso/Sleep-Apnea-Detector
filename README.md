@@ -1,5 +1,9 @@
 # Embedded Sleep Apnea Detection (TinyML on STM32)
 
+
+https://github.com/user-attachments/assets/019f06b4-0b5f-4eba-8f14-a2a3489d51d9
+
+
 ![Language](https://img.shields.io/badge/language-C%20%7C%20Python-blue)
 ![Hardware](https://img.shields.io/badge/Hardware-STM32F446RE-green)
 ![ML](https://img.shields.io/badge/AI-TensorFlow%20%7C%20STM32Cube.AI-orange)
